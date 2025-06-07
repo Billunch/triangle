@@ -7,7 +7,7 @@ import schedule
 from flask import Flask
 from dotenv import load_dotenv
 
-# === 環境變數 ===
+# === 載入環境變數 ===
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -30,12 +30,14 @@ sim_wallet = {
     "history": []
 }
 
+# === 建立 Flask 應用 ===
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return f"🟢 OKX Arbitrage Running - USDT Balance: {sim_wallet['usdt']:.2f}"
 
+# === 發送 Telegram 訊息 ===
 def send_telegram(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     try:
@@ -43,6 +45,7 @@ def send_telegram(msg):
     except Exception as e:
         print("Telegram 發送失敗：", e)
 
+# === 執行套利檢查 ===
 def check_arbitrage():
     try:
         tickers = {
@@ -99,11 +102,13 @@ def check_arbitrage():
     except Exception as e:
         print("套利檢查錯誤：", e)
 
+# === 持續輪詢套利邏輯 ===
 def loop_arbitrage():
     while True:
         check_arbitrage()
         time.sleep(1)
 
+# === 每日報告發送 ===
 def send_daily_report():
     usdt = sim_wallet["usdt"]
     twd_equivalent = usdt * TWD_USDT_RATE
@@ -118,14 +123,19 @@ def send_daily_report():
     )
     send_telegram(msg)
 
+# === 報告排程器 ===
 def schedule_daily_report():
     schedule.every().day.at("09:00").do(send_daily_report)
     while True:
         schedule.run_pending()
         time.sleep(30)
 
+# === 主程式入口（Render 支援） ===
 if __name__ == "__main__":
     send_telegram(f"🚀 OKX 套利模擬器啟動（含反向套利，每秒掃描）\n初始資金：{sim_wallet['usdt']:.2f} USDT")
     threading.Thread(target=loop_arbitrage, daemon=True).start()
     threading.Thread(target=schedule_daily_report, daemon=True).start()
-    app.run(host="0.0.0.0", port=10000)
+    
+    # ✅ 適用 Render 的動態 PORT 綁定
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
